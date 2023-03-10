@@ -12,6 +12,9 @@ def visit_all_dirs_and_files(directory, convert_list):
             #设置视频文件格式后缀，缺少的自行增加
             if ext.lower() in ['.mkv', '.mp4', '.rmvb', '.avi', '.wmv']:
                 vsmeta_path = os.path.join(root, filename + '.vsmeta')
+                #以下两行代码用于删除已有vsmeta文件
+                #if os.path.exists(vsmeta_path):
+                #    os.remove(vsmeta_path)
                 if not os.path.exists(vsmeta_path):
                     nfo_path = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
                     convert_list.append(nfo_path)
