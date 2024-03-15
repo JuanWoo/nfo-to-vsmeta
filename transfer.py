@@ -95,12 +95,6 @@ def action(nfo_path, target_path, poster_path, fanart_path):
 
         writeLength(output, groupLen)
 
-#        if groupLen < 128:
-#            output.write(bytes([groupLen]))
-#        else:
-#            output.write(bytes([groupLen % 128 + 128]))
-#            output.write(bytes([groupLen // 128]))
-
         for a in act:
             writeTag(output, 0x0A)
             writeString(output, a)
