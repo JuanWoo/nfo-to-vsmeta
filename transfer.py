@@ -13,7 +13,7 @@ def visit_all_dirs_and_files(directory, convert_list, poster, fanart):
             if '@eaDir' in root:
                 continue
             _, ext = os.path.splitext(filename)
-            if ext.lower() in ['.mkv', '.mp4', '.rmvb', '.avi', '.wmv']:  #设置视频文件格式后缀，缺少的自行增加
+            if ext.lower() in ['.mkv', '.mp4', '.rmvb', '.avi', '.wmv', '.ts']:  #设置视频文件格式后缀，缺少的自行增加
                 vsmeta_path = os.path.join(root, filename + '.vsmeta')
                 #以下两行代码用于删除已有vsmeta文件
                 #if os.path.exists(vsmeta_path):
@@ -34,18 +34,18 @@ def visit_all_dirs_and_files(directory, convert_list, poster, fanart):
 def action(nfo_path, target_path, poster_path, fanart_path):
     
     doc = xmldom.parse(nfo_path)
-    title = doc.getElementsByTagName('title')[0].firstChild.nodeValue
-    sorttitle = doc.getElementsByTagName('sorttitle')[0].firstChild.nodeValue if doc.getElementsByTagName('sorttitle') else title
-    plot = doc.getElementsByTagName('plot')[0].firstChild.nodeValue if doc.getElementsByTagName('plot') else ' '
-    year = doc.getElementsByTagName('year')[0].firstChild.nodeValue if doc.getElementsByTagName('year') else '2020'
-    level = doc.getElementsByTagName('mpaa')[0].firstChild.nodeValue if doc.getElementsByTagName('mpaa') else 'G'
-    date = doc.getElementsByTagName('premiered')[0].firstChild.nodeValue if doc.getElementsByTagName('premiered') else '2020-01-01'
-    rate = doc.getElementsByTagName('rating')[0].firstChild.nodeValue if doc.getElementsByTagName('rating') else '0'
-    genre = [node.firstChild.nodeValue for node in doc.getElementsByTagName('genre')]
-    act = [node.firstChild.nodeValue for node in doc.getElementsByTagName('name')]
-    direc = [node.firstChild.nodeValue for node in doc.getElementsByTagName('director')]
-    writ = [node.firstChild.nodeValue for node in doc.getElementsByTagName('writer')]
-#    stu = [node.firstChild.nodeValue for node in doc.getElementsByTagName('studio')]
+    title = getNode(doc, 'title', '无标题')
+    sorttitle = getNode(doc, 'sorttitle', title)
+    plot = getNode(doc, 'plot', ' ')
+    year = getNode(doc, 'year', '1900')
+    level = getNode(doc, 'mpaa', 'G')
+    date = getNode(doc, 'premiered', '1900-01-01')
+    rate = getNode(doc, 'rating', '0')
+    genre = getNodeList(doc, 'genre', [])
+    act = getNodeList(doc, 'name', [])
+    direc = getNodeList(doc, 'director', [])
+    writ = getNodeList(doc, 'writer', [])
+#    stu = getNodeList(doc, 'studio', [])
 
 
     with open(target_path, 'wb') as output:
@@ -79,21 +79,7 @@ def action(nfo_path, target_path, poster_path, fanart_path):
         writeString(output, 'null')
 
         writeTag(output, 0x52)
-
-        groupLen = 0
-        for g in genre:
-            groupLen += 2 + lenOfEncode(g)
-
-        for a in act:
-            groupLen += 2 + lenOfEncode(a)
-
-        for d in direc:
-            groupLen += 2 + lenOfEncode(d)
-
-        for w in writ:
-            groupLen += 2 + lenOfEncode(w)
-
-        writeLength(output, groupLen)
+        writeLength(output, getGroupLen(genre) + getGroupLen(act) + getGroupLen(direc) + getGroupLen(writ))
 
         for a in act:
             writeTag(output, 0x0A)
@@ -169,6 +155,11 @@ def action(nfo_path, target_path, poster_path, fanart_path):
 def lenOfEncode(string):
     return len(string.encode('utf-8'))
 
+def getGroupLen(l):
+    if len(l) < 1 :
+        return 0
+    return lenOfEncode('12'.join(l)) + 2#每个人员有两位占位符，故每个元素+2的长度
+
 def writeTag(op, t):
     op.write(bytes([int(str(t))]))
 
@@ -189,7 +180,17 @@ def writeLength(op, len):
         len = len // 128
     op.write(bytes([len]))
 
+def getNode(doc, tag, default):
+    nd = doc.getElementsByTagName(tag)
+    if len(nd) < 1 or not nd[0].hasChildNodes() :
+        return default
+    return nd[0].firstChild.nodeValue
 
+def getNodeList(doc, tag, default):
+    node = doc.getElementsByTagName(tag)
+    if len(node) < 1 or not node[0].hasChildNodes() :
+        return default
+    return [nd.firstChild.nodeValue for nd in doc.getElementsByTagName(tag)]
 
 if __name__ == '__main__':
     poster = 'poster.jpg'#封面图默认名
