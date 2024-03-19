@@ -41,11 +41,11 @@ def action(nfo_path, target_path, poster_path, fanart_path):
     level = getNode(doc, 'mpaa', 'G')
     date = getNode(doc, 'premiered', '1900-01-01')
     rate = getNode(doc, 'rating', '0')
-    genre = getNodeList(doc, 'genre', [])
-    act = getNodeList(doc, 'name', [])
-    direc = getNodeList(doc, 'director', [])
-    writ = getNodeList(doc, 'writer', [])
-#    stu = getNodeList(doc, 'studio', [])
+    genre = getNodeList(doc, 'genre', '', [])
+    act = getNodeList(doc, 'actor', 'name', [])
+    direc = getNodeList(doc, 'director', '', [])
+    writ = getNodeList(doc, 'writer', '', [])
+#    stu = getNodeList(doc, 'studio', '', [])
 
 
     with open(target_path, 'wb') as output:
@@ -158,7 +158,7 @@ def lenOfEncode(string):
 def getGroupLen(l):
     if len(l) < 1 :
         return 0
-    return lenOfEncode('12'.join(l)) + 2#每个人员有两位占位符，故每个元素+2的长度
+    return lenOfEncode('12'.join(l)) + 2#每个人员有两位标签占位符，故每个元素+2的长度
 
 def writeTag(op, t):
     op.write(bytes([int(str(t))]))
@@ -186,11 +186,17 @@ def getNode(doc, tag, default):
         return default
     return nd[0].firstChild.nodeValue
 
-def getNodeList(doc, tag, default):
-    node = doc.getElementsByTagName(tag)
-    if len(node) < 1 or not node[0].hasChildNodes() :
+def getNodeList(doc, tag, childTag, default):
+    nds = doc.getElementsByTagName(tag)
+    if len(nds) < 1 or not nds[0].hasChildNodes() :
         return default
-    return [nd.firstChild.nodeValue for nd in doc.getElementsByTagName(tag)]
+    if len(childTag) == 0:
+        return [nd.firstChild.nodeValue for nd in nds]
+    else:
+        nodes = []
+        for nd in nds:
+            nodes.append(getNode(nd, childTag, ''))
+        return nodes
 
 if __name__ == '__main__':
     poster = 'poster.jpg'#封面图默认名
