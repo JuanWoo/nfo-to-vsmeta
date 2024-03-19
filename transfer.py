@@ -104,24 +104,12 @@ def action(nfo_path, target_path, poster_path, fanart_path):
         writeTag(output, 0x60)
         writeInt(output, int(float(rate) * 10))
 
-        splitleng = 76
         if os.path.exists(poster_path):
             writeTag(output, 0x8A)
             writeTag(output, 0x01)
 
-            with open(poster_path, "rb") as p:
-                poster_bytes = p.read()
-
-#            img = Image.open(io.BytesIO(poster_bytes))
-#            final_img = img.resize((472, 700), Image.LANCZOS)
-#            img_byte = io.BytesIO()
-#            final_img.save(img_byte, 'png')
-#            posterBase64 = base64.b64encode(img_byte.getvalue()).decode('utf-8')
-#            print(posterBase64)
-            posterBase64 = base64.b64encode(poster_bytes).decode('utf-8')
-            posterList = [posterBase64[i:i+splitleng] for i in range(0, len(posterBase64), splitleng)]
-            posterFinal = '\n'.join(posterList)
-            posterMd5 = hashlib.md5(posterFinal.encode("utf-8")).hexdigest()
+            posterFinal = toBase64(poster_path)
+            posterMd5 = toMd5(posterFinal)
 
             writeString(output, posterFinal)
             writeTag(output, 0x92)
@@ -132,12 +120,8 @@ def action(nfo_path, target_path, poster_path, fanart_path):
             writeTag(output, 0xAA)
             writeTag(output, 0x01)
 
-            with open(fanart_path, "rb") as f:
-                fanart_bytes = f.read()
-            fanartBase64 = base64.b64encode(fanart_bytes).decode('utf-8')
-            fanartList = [fanartBase64[i:i+splitleng] for i in range(0, len(fanartBase64), splitleng)]
-            fanartFinal = '\n'.join(fanartList)
-            fanartMd5 = hashlib.md5(fanartFinal.encode("utf-8")).hexdigest()
+            fanartFinal = toBase64(fanart_path)
+            fanartMd5 = toMd5(fanartFinal)
 
             writeLength(output, lenOfEncode(fanartFinal)+40)#写两次长度，第一次含md5及所有标签的总长度，故+40
             writeTag(output, 0x0A)
@@ -198,6 +182,22 @@ def getNodeList(doc, tag, childTag, default):
         for nd in nds:
             nodes.append(getNode(nd, childTag, ''))
         return nodes
+
+def toBase64(picPath):
+    splitleng = 76
+    with open(picPath, "rb") as p:
+        picBytes = p.read()
+#    img = Image.open(io.BytesIO(picBytes))
+#    final_img = img.resize((472, 700), Image.LANCZOS)
+#    img_byte = io.BytesIO()
+#    final_img.save(img_byte, 'png')
+#    picBase64 = base64.b64encode(img_byte.getvalue()).decode('utf-8')
+    picBase64 = base64.b64encode(picBytes).decode('utf-8')
+    picList = [picBase64[i:i+splitleng] for i in range(0, len(picBase64), splitleng)]
+    return '\n'.join(picList)
+
+def toMd5(picFinal):
+    return hashlib.md5(picFinal.encode("utf-8")).hexdigest()
 
 if __name__ == '__main__':
     poster = 'poster.jpg'#封面图默认名
