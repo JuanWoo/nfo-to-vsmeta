@@ -178,10 +178,7 @@ def getNodeList(doc, tag, childTag, default):
     if len(childTag) == 0:
         return [nd.firstChild.nodeValue for nd in nds]
     else:
-        nodes = []
-        for nd in nds:
-            nodes.append(getNode(nd, childTag, ''))
-        return nodes
+        return [getNode(nd, childTag, '') for nd in nds]
 
 def toBase64(picPath):
     splitleng = 76
