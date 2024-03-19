@@ -36,6 +36,7 @@ def action(nfo_path, target_path, poster_path, fanart_path):
     doc = xmldom.parse(nfo_path)
     title = getNode(doc, 'title', '无标题')
     sorttitle = getNode(doc, 'sorttitle', title)
+    tagline = getNode(doc, 'tagline', title)
     plot = getNode(doc, 'plot', ' ')
     year = getNode(doc, 'year', '1900')
     level = getNode(doc, 'mpaa', 'G')
@@ -56,10 +57,10 @@ def action(nfo_path, target_path, poster_path, fanart_path):
         writeString(output, title)
 
         writeTag(output, 0x1A)
-        writeString(output, title)
+        writeString(output, sorttitle)
 
         writeTag(output, 0x22)
-        writeString(output, sorttitle)
+        writeString(output, tagline)
 
         writeTag(output, 0x28)
         writeTag(output, 0xDC)#待定，含义不明，不是年份
