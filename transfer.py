@@ -4,174 +4,162 @@ import os
 import xml.dom.minidom as xmldom
 import base64
 import hashlib
-#import io
-#from PIL import Image
+import time
+import io
+from PIL import Image
 
-def visit_all_dirs_and_files(directory, convert_list, poster, fanart):
+def checkAllFiles(directory, convertList, poster, fanart):
     for root, dirs, files in os.walk(directory):
         for filename in files:
             if '@eaDir' in root:
                 continue
             _, ext = os.path.splitext(filename)
             if ext.lower() in ['.mkv', '.mp4', '.rmvb', '.avi', '.wmv', '.ts']:  #设置视频文件格式后缀，缺少的自行增加
-                vsmeta_path = os.path.join(root, filename + '.vsmeta')
+                vsmetaPath = os.path.join(root, filename + '.vsmeta')
                 #以下两行代码用于删除已有vsmeta文件
-                #if os.path.exists(vsmeta_path):
-                #    os.remove(vsmeta_path)
-                poster_path = os.path.join(root, poster)
-                fanart_path = os.path.join(root, fanart)
-                if not os.path.exists(vsmeta_path):
-                    nfo_path = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
-                    convert_list.append(nfo_path)
-                    if os.path.exists(nfo_path):
+                #if os.path.exists(vsmetaPath):
+                #    os.remove(vsmetaPath)
+                posterPath = os.path.join(root, poster)
+                fanartPath = os.path.join(root, fanart)
+                if not os.path.exists(vsmetaPath):
+                    nfoPath = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
+                    convertList.append(nfoPath)
+                    if os.path.exists(nfoPath):
                         try:
-                            action(nfo_path, vsmeta_path, poster_path, fanart_path)
+                            action(nfoPath, vsmetaPath, posterPath, fanartPath)
                         except Exception as e:
                             print(e)
             elif ext.lower() not in ['.vsmeta', '.jpg', '.nfo', '.srt', '.ass', '.ssa', '.png', '.db']:  #用于检查缺少的视频文件格式后缀。需要忽略的文件格式后缀自行增加
                 print('Unrecognized file:', os.path.join(root, filename))
 
-def action(nfo_path, target_path, poster_path, fanart_path):
+def action(nfoPath, target_path, posterPath, fanartPath):
     
-    doc = xmldom.parse(nfo_path)
+    doc = xmldom.parse(nfoPath)
     title = getNode(doc, 'title', '无标题')
     sorttitle = getNode(doc, 'sorttitle', title)
     tagline = getNode(doc, 'tagline', title)
-    plot = getNode(doc, 'plot', ' ')
+    plot = getNode(doc, 'plot')
     year = getNode(doc, 'year', '1900')
     level = getNode(doc, 'mpaa', 'G')
     date = getNode(doc, 'premiered', '1900-01-01')
     rate = getNode(doc, 'rating', '0')
-    genre = getNodeList(doc, 'genre', '', [])
-    act = getNodeList(doc, 'actor', 'name', [])
-    direc = getNodeList(doc, 'director', '', [])
-    writ = getNodeList(doc, 'writer', '', [])
-#    stu = getNodeList(doc, 'studio', '', [])
+    genre = getNodeList(doc, 'genre')
+    act = getNodeList(doc, 'actor', 'name')
+    direc = getNodeList(doc, 'director')
+    writ = getNodeList(doc, 'writer')
+#    stu = getNodeList(doc, 'studio')
+
+    buf, group = bytearray(), bytearray()
+    writeByte(buf, 0x08)
+    writeByte(buf, 0x01)
+
+    writeByte(buf, 0x12)
+    writeString(buf, title)
+
+    writeByte(buf, 0x1A)
+    writeString(buf, sorttitle)
+
+    writeByte(buf, 0x22)
+    writeString(buf, tagline)
+
+    writeByte(buf, 0x28)
+    writeInt(buf, int(year))
+
+    writeByte(buf, 0x32)
+    writeString(buf, date)
+
+    writeByte(buf, 0x38)
+    writeByte(buf, 0x01)
+
+    writeByte(buf, 0x42)
+    writeString(buf, plot)
+
+    writeByte(buf, 0x4A)
+    writeString(buf, 'null')
+
+    for a in act:
+        writeByte(group, 0x0A)
+        writeString(group, a)
+
+    for d in direc:
+        writeByte(group, 0x12)
+        writeString(group, d)
+
+    for g in genre:
+        writeByte(group, 0x1A)
+        writeString(group, g)
+
+    for w in writ:
+        writeByte(group, 0x22)
+        writeString(group, w)
+
+    writeByte(buf, 0x52)
+    writeInt(buf, len(group))
+    buf.extend(group)
+    group.clear()
+
+    writeByte(buf, 0x5A)
+    writeString(buf, level)
+
+    writeByte(buf, 0x60)
+    writeInt(buf, int(float(rate) * 10))
+
+    if os.path.exists(posterPath):
+        writeByte(buf, 0x8A)
+        writeByte(buf, 0x01)
+
+        posterFinal = toBase64(posterPath)
+        posterMd5 = toMd5(posterFinal)
+
+        writeString(buf, posterFinal)
+        writeByte(buf, 0x92)
+        writeByte(buf, 0x01)
+        writeString(buf, posterMd5)
+
+    if os.path.exists(fanartPath):
+        writeByte(buf, 0xAA)
+        writeByte(buf, 0x01)
+
+        fanartFinal = toBase64(fanartPath)
+        fanartMd5 = toMd5(fanartFinal)
+
+        writeByte(group, 0x0A)
+        writeString(group, fanartFinal)
+        writeByte(group, 0x12)
+        writeString(group, fanartMd5)
+        writeByte(group, 0x18)
+        writeInt(group, int(time.time()))
+
+        writeInt(buf, len(group))
+        buf.extend(group)
+        group.clear()
+
+    with open(target_path, 'wb') as op:
+        op.write(buf)
 
 
-    with open(target_path, 'wb') as output:
-        writeTag(output, 0x08)
-        writeTag(output, 0x01)
+def writeByte(ba, t):
+    ba.extend(bytes([int(str(t))]))
 
-        writeTag(output, 0x12)
-        writeString(output, title)
-
-        writeTag(output, 0x1A)
-        writeString(output, sorttitle)
-
-        writeTag(output, 0x22)
-        writeString(output, tagline)
-
-        writeTag(output, 0x28)
-        writeTag(output, 0xDC)#待定，含义不明，不是年份
-        #writeInt(output, year)
-        writeTag(output, 0x0F)
-
-        writeTag(output, 0x32)
-        writeString(output, date)
-
-        writeTag(output, 0x38)
-        writeTag(output, 0x01)
-
-        writeTag(output, 0x42)
-        writeString(output, plot)
-
-        writeTag(output, 0x4A)
-        writeString(output, 'null')
-
-        writeTag(output, 0x52)
-        writeLength(output, getGroupLen(genre) + getGroupLen(act) + getGroupLen(direc) + getGroupLen(writ))
-
-        for a in act:
-            writeTag(output, 0x0A)
-            writeString(output, a)
-
-        for d in direc:
-            writeTag(output, 0x12)
-            writeString(output, d)
-
-        for g in genre:
-            writeTag(output, 0x1A)
-            writeString(output, g)
-
-        for w in writ:
-            writeTag(output, 0x22)
-            writeString(output, w)
-
-        writeTag(output, 0x5A)
-        writeString(output, level)
-
-        writeTag(output, 0x60)
-        writeInt(output, int(float(rate) * 10))
-
-        if os.path.exists(poster_path):
-            writeTag(output, 0x8A)
-            writeTag(output, 0x01)
-
-            posterFinal = toBase64(poster_path)
-            posterMd5 = toMd5(posterFinal)
-
-            writeString(output, posterFinal)
-            writeTag(output, 0x92)
-            writeTag(output, 0x01)
-            writeString(output, posterMd5)
-
-        if os.path.exists(fanart_path):
-            writeTag(output, 0xAA)
-            writeTag(output, 0x01)
-
-            fanartFinal = toBase64(fanart_path)
-            fanartMd5 = toMd5(fanartFinal)
-
-            writeLength(output, lenOfEncode(fanartFinal)+40)#写两次长度，第一次含md5及所有标签的总长度，故+40
-            writeTag(output, 0x0A)
-            writeString(output, fanartFinal)
-            writeTag(output, 0x12)
-            writeString(output, fanartMd5)
-
-        writeTag(output, 0x18)
-        writeTag(output, 0xB2)#待定，含义不明
-        writeTag(output, 0x9E)#待定，含义不明
-        writeTag(output, 0xCC)#待定，含义不明
-        writeTag(output, 0xAF)
-        writeTag(output, 0x06)
-
-
-def lenOfEncode(string):
-    return len(string.encode('utf-8'))
-
-def getGroupLen(l):
-    if len(l) < 1 :
-        return 0
-    return lenOfEncode('12'.join(l)) + 2#每个人员有两位标签占位符，故每个元素+2的长度
-
-def writeTag(op, t):
-    op.write(bytes([int(str(t))]))
-
-def writeInt(op, i):
-    op.write(i.to_bytes(1, 'little'))
-
-def writeString(op, string):
-    writeByte(op, string.encode('utf-8'))
-
-def writeByte(op, byte):
+def writeString(ba, string):
+    byte = string.encode('utf-8')
     length = len(byte)
-    writeLength(op, length)
-    op.write(byte)
+    writeInt(ba, length)
+    ba.extend(byte)
 
-def writeLength(op, len):
+def writeInt(ba, len):
     while len > 128:
-        op.write(bytes([len % 128 + 128]))
+        writeByte(ba, len % 128 + 128)
         len = len // 128
-    op.write(bytes([len]))
+    writeByte(ba, len)
 
-def getNode(doc, tag, default):
+def getNode(doc, tag, default = ' '):
     nd = doc.getElementsByTagName(tag)
     if len(nd) < 1 or not nd[0].hasChildNodes() :
         return default
     return nd[0].firstChild.nodeValue
 
-def getNodeList(doc, tag, childTag, default):
+def getNodeList(doc, tag, childTag = '', default = []):
     nds = doc.getElementsByTagName(tag)
     if len(nds) < 1 or not nds[0].hasChildNodes() :
         return default
@@ -184,14 +172,27 @@ def toBase64(picPath):
     splitleng = 76
     with open(picPath, "rb") as p:
         picBytes = p.read()
-#    img = Image.open(io.BytesIO(picBytes))
-#    final_img = img.resize((472, 700), Image.LANCZOS)
-#    img_byte = io.BytesIO()
-#    final_img.save(img_byte, 'png')
-#    picBase64 = base64.b64encode(img_byte.getvalue()).decode('utf-8')
-    picBase64 = base64.b64encode(picBytes).decode('utf-8')
+    picBase64 = compressPic(picBytes).decode('utf-8')
     picList = [picBase64[i:i+splitleng] for i in range(0, len(picBase64), splitleng)]
     return '\n'.join(picList)
+
+def compressPic(bytes, kb = 200, k = 0.8):
+    with io.BytesIO(bytes) as im:
+        picSize = len(im.getvalue()) // 1024
+        if picSize <= kb:
+            return base64.b64encode(bytes)
+        imTemp = im
+        while picSize > kb:
+            img = Image.open(imTemp)
+            x, y = img.size
+            out = img.resize((int(x * k), int(y * k)), Image.LANCZOS)
+            imTemp.close()
+            imTemp = io.BytesIO()
+            out.save(imTemp, 'jpeg')
+            picSize = len(imTemp.getvalue()) // 1024
+        b64 = base64.b64encode(imTemp.getvalue())
+        imTemp.close()
+        return b64
 
 def toMd5(picFinal):
     return hashlib.md5(picFinal.encode("utf-8")).hexdigest()
@@ -200,9 +201,9 @@ if __name__ == '__main__':
     poster = 'poster.jpg'#封面图默认名
     fanart = 'fanart.jpg'#背景图默认名
     directory = r'/volume1/video/Links/Movie/'
-    convert_list = []
-    visit_all_dirs_and_files(directory, convert_list, poster, fanart)
+    convertList = []
+    checkAllFiles(directory, convertList, poster, fanart)
 
-    print('success ' + str(len(convert_list)) + ' files')
-    #for item in convert_list:
+    print('success ' + str(len(convertList)) + ' files')
+    #for item in convertList:
     #    print(item)
